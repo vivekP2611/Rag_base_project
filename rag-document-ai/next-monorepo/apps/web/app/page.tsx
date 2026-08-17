@@ -194,7 +194,7 @@ function countMatches(text: string, terms: string[]): { count: number; items: st
 
   matchedLines.slice(0, 30).forEach(line => {
     (line.match(nameRe) || [])
-      .filter(m => !IGNORE.has(m.split(' ')[0]) && m.length > 3)
+      .filter(m => !IGNORE.has(m.split(' ')[0] ?? '') && m.length > 3)
       .forEach(m => { if (!seen.has(m)) { seen.add(m); items.push(m); } });
   });
 
@@ -225,7 +225,7 @@ export function generateAnswer(question: string, ctx: DocContext): string {
       if (rel.length > 0) return synthesise(rel, 2);
       return `I couldn't find any "${subject}" in the document.`;
     }
-    if (items.length > 0 && items[0].length > 20) {
+    if (items.length > 0 && items[0] && items[0].length > 20) {
       // items are full lines/sentences — show count + preview
       return `There are **${count}** ${subject} in this document.\n\nHere are the first few:\n\n${items.slice(0, 5).map((it, i) => `${i + 1}. ${it.slice(0, 120)}${it.length > 120 ? '…' : ''}`).join('\n')}`;
     }
