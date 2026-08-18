@@ -1,6 +1,6 @@
 'use client';
 
-import { Send, Loader, Bot, User } from 'lucide-react';
+import { Send, Bot, User, Sparkles } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 interface Message {
@@ -15,26 +15,26 @@ interface ChatSidebarProps {
   enabled?: boolean;
   onSendMessage?: (message: string) => Promise<string>;
   isLoading?: boolean;
+  triggerQuestion?: string;
+  onClearTriggerQuestion?: () => void;
 }
 
-/** Render **bold** markdown in text */
 function renderMarkdown(text: string): React.ReactNode[] {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
+      return <strong key={i} className="text-indigo-300">{part.slice(2, -2)}</strong>;
     }
     return <span key={i}>{part}</span>;
   });
 }
 
-/** Render newlines and bold markdown */
 function MessageContent({ text }: { text: string }) {
   const lines = text.split('\n');
   return (
     <div className="text-sm leading-relaxed">
       {lines.map((line, i) => (
-        <p key={i} className={i > 0 ? 'mt-1' : ''}>
+        <p key={i} className={i > 0 ? 'mt-2' : ''}>
           {renderMarkdown(line)}
         </p>
       ))}
@@ -47,6 +47,8 @@ export function ChatSidebar({
   enabled = false,
   onSendMessage,
   isLoading = false,
+  triggerQuestion,
+  onClearTriggerQuestion,
 }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -59,12 +61,52 @@ export function ChatSidebar({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, loading]);
 
-  // Reset chat when document changes
   useEffect(() => {
     setMessages([]);
   }, [documentId]);
+
+  useEffect(() => {
+    if (triggerQuestion && enabled && !loading) {
+      const sendTriggered = async () => {
+        const userMsg: Message = {
+          id: Date.now().toString(),
+          role: 'user',
+          content: triggerQuestion.trim(),
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, userMsg]);
+        setLoading(true);
+        if (onClearTriggerQuestion) onClearTriggerQuestion();
+
+        try {
+          if (onSendMessage) {
+            const response = await onSendMessage(userMsg.content);
+            const assistantMsg: Message = {
+              id: (Date.now() + 1).toString(),
+              role: 'assistant',
+              content: response,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+          }
+        } catch {
+          const errMsg: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: 'Connection lost in the neural matrix. Please try again.',
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errMsg]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      sendTriggered();
+    }
+  }, [triggerQuestion, enabled, loading, onSendMessage, onClearTriggerQuestion]);
 
   const handleSend = async () => {
     if (!input.trim() || !enabled || loading) return;
@@ -95,7 +137,7 @@ export function ChatSidebar({
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Sorry, something went wrong. Please try again.',
+        content: 'Connection lost in the neural matrix. Please try again.',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errMsg]);
@@ -112,34 +154,31 @@ export function ChatSidebar({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-transparent">
       {/* Header */}
-      <div className="border-b border-gray-200 px-4 py-3 bg-white flex items-center gap-2">
-        <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center">
-          <Bot className="w-4 h-4 text-white" />
+      <div className="border-b border-white/10 px-6 py-4 bg-transparent flex items-center gap-4">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+          <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h3 className="font-semibold text-gray-900 text-sm">Document Assistant</h3>
-          <p className="text-xs text-gray-400">Ask anything about your document</p>
+          <h3 className="font-semibold text-white tracking-tight text-lg">DocMind AI</h3>
+          <p className="text-xs text-indigo-300 font-medium">Ready for your questions</p>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {messages.length === 0 && (
-          <div className="h-full flex items-center justify-center text-center py-8">
+          <div className="h-full flex items-center justify-center text-center">
             <div>
-              <Bot className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-400 text-sm">
+              <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-center mx-auto mb-4">
+                <Bot className="w-8 h-8 text-gray-500" />
+              </div>
+              <p className="text-gray-400 text-sm max-w-xs mx-auto">
                 {enabled
-                  ? 'Ask a question about your document'
-                  : 'Upload a document to start chatting'}
+                  ? 'The document knowledge base is loaded. Ask me anything.'
+                  : 'Awaiting document upload...'}
               </p>
-              {enabled && (
-                <div className="mt-3 space-y-1 text-xs text-gray-400">
-                  <p>Ask anything about your document in your own words.</p>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -147,25 +186,25 @@ export function ChatSidebar({
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {msg.role === 'assistant' && (
-              <div className="w-7 h-7 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center mt-1">
-                <Bot className="w-4 h-4 text-blue-600" />
+              <div className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex-shrink-0 flex items-center justify-center mt-1">
+                <Sparkles className="w-4 h-4 text-indigo-400" />
               </div>
             )}
 
             <div
-              className={`max-w-[85%] px-4 py-3 rounded-2xl shadow-sm ${
+              className={`max-w-[85%] px-5 py-3.5 rounded-2xl ${
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-sm'
-                  : 'bg-white text-gray-900 rounded-bl-sm border border-gray-100'
+                  ? 'bg-indigo-600 text-white rounded-br-sm shadow-[0_0_20px_rgba(79,70,229,0.3)]'
+                  : 'bg-white/[0.03] text-gray-200 rounded-bl-sm border border-white/10 shadow-inner'
               }`}
             >
               <MessageContent text={msg.content} />
               <p
-                className={`text-xs mt-2 ${
-                  msg.role === 'user' ? 'text-blue-200 text-right' : 'text-gray-400'
+                className={`text-[10px] mt-2 font-medium tracking-wide ${
+                  msg.role === 'user' ? 'text-indigo-200 text-right' : 'text-gray-500'
                 }`}
               >
                 {msg.timestamp.toLocaleTimeString([], {
@@ -176,56 +215,49 @@ export function ChatSidebar({
             </div>
 
             {msg.role === 'user' && (
-              <div className="w-7 h-7 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center mt-1">
-                <User className="w-4 h-4 text-gray-600" />
+              <div className="w-8 h-8 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center mt-1">
+                <User className="w-4 h-4 text-gray-300" />
               </div>
             )}
           </div>
         ))}
 
         {loading && (
-          <div className="flex gap-2 justify-start">
-            <div className="w-7 h-7 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
-              <Bot className="w-4 h-4 text-blue-600" />
+          <div className="flex gap-3 justify-start">
+            <div className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex-shrink-0 flex items-center justify-center mt-1">
+              <Sparkles className="w-4 h-4 text-indigo-400" />
             </div>
-            <div className="bg-white border border-gray-100 px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm">
-              <div className="flex gap-1 items-center h-5">
-                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:300ms]" />
-              </div>
+            <div className="bg-white/[0.03] border border-white/10 px-5 py-4 rounded-2xl rounded-bl-sm flex items-center gap-1.5 shadow-inner">
+              <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:0ms]" />
+              <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:150ms]" />
+              <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:300ms]" />
             </div>
           </div>
         )}
 
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-2" />
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 p-3 bg-white">
-        <div className="flex gap-2">
+      <div className="p-4 bg-transparent border-t border-white/5">
+        <div className="flex gap-3 bg-white/[0.03] border border-white/10 rounded-2xl p-1.5 focus-within:border-indigo-500/50 focus-within:bg-white/[0.05] transition-colors shadow-inner">
           <input
             type="text"
-            id="chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={enabled ? 'Ask a question…' : 'Upload a document first'}
+            placeholder={enabled ? 'Message DocMind...' : 'Upload a document first'}
             disabled={!enabled || loading}
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400 bg-gray-50"
+            className="flex-1 px-4 py-2.5 bg-transparent border-none text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-0 disabled:opacity-50"
           />
           <button
-            id="chat-send-btn"
             onClick={handleSend}
             disabled={!enabled || loading || !input.trim()}
-            className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:bg-gray-200 disabled:cursor-not-allowed"
+            className="w-11 h-11 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-colors disabled:bg-white/5 disabled:text-gray-500 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(79,70,229,0.4)] disabled:shadow-none"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-5 h-5 ml-0.5" />
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-2 text-center">
-          Press Enter to send
-        </p>
       </div>
     </div>
   );

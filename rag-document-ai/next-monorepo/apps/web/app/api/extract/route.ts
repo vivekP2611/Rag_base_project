@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    // Forward to Python backend
+    // Forward to Python backend for extraction + embedding
     const pythonFormData = new FormData();
     pythonFormData.append('file', file);
 
@@ -21,14 +21,19 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
 
-    if (!response.ok) {
-      return NextResponse.json({ error: data.error || 'Backend extraction failed' }, { status: response.status });
+    if (!response.ok || data.error) {
+      return NextResponse.json(
+        { error: data.error || data.detail || 'Backend extraction failed' },
+        { status: response.status }
+      );
     }
 
     return NextResponse.json({
       success: true,
+      session_id: data.session_id,
       text: data.text,
-      chunks: data.chunks,
+      text_preview: data.text_preview,
+      chunk_count: data.chunk_count,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
