@@ -324,5 +324,13 @@ async def health():
 # ─── Entry point ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("backend_app:app", host="0.0.0.0", port=port, reload=True)
+
+    host = os.environ.get("BACKEND_HOST", "127.0.0.1") or "127.0.0.1"
+    port = int(os.environ.get("BACKEND_PORT") or os.environ.get("PORT") or 8001)
+
+    try:
+        uvicorn.run("backend_app:app", host=host, port=port, reload=False)
+    except OSError as exc:
+        fallback_port = 8001 if port != 8001 else 8000
+        logging.warning("Port %s unavailable (%s). Retrying on %s.", port, exc, fallback_port)
+        uvicorn.run("backend_app:app", host=host, port=fallback_port, reload=False)

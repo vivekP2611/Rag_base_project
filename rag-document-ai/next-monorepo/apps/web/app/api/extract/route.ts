@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const pythonFormData = new FormData();
     pythonFormData.append('file', file);
 
-    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000';
+    const backendUrl = 'http://127.0.0.1:8001';
     const response = await fetch(`${backendUrl}/extract`, {
       method: 'POST',
       body: pythonFormData,
